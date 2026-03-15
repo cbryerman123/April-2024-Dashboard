@@ -5,7 +5,7 @@ from datetime import date
 import urllib.parse
 import requests
 
-# 1. Page Config must be the absolute first line
+# 1. Page Config
 st.set_page_config(page_title="BDR Sales Command Center", layout="wide")
 
 file_path = "LEKE FOCUS FOR MARCH - Sheet1.csv"
@@ -18,14 +18,8 @@ def load_data():
         reader = csv.DictReader(f)
         data = [row for row in reader if any(row.values())]
         cols = [c.strip() for c in reader.fieldnames] if reader.fieldnames else []
-    # Ensure tracking columns exist
     for c in ['Last Outreach', 'Status', 'Notes']:
         if c not in cols: cols.append(c)
-    # Fill defaults
-    for row in data:
-        if not row.get('Status'): row['Status'] = 'Not Started'
-        if not row.get('Last Outreach'): row['Last Outreach'] = 'None'
-        if not row.get('Notes'): row['Notes'] = ''
     return data, cols
 
 data, cols = load_data()
@@ -50,15 +44,25 @@ else:
             else:
                 try:
                     api_key = st.secrets["SERPER_API_KEY"]
-                    url = "https://google.serper.dev/news"
-                    res = requests.post(url, json={"q": f"{selected_acc} news"}, headers={'X-API-KEY': api_key})
-                    news = res.json().get("news", [])
-                    if news:
-                        for item in news[:3]:
-                            st.write(f"✅ **{item['title']}**")
-                            st.caption(f"{item.get('source', 'Web')} | {item.get('date', 'Recent')}")
+                    url = "https://google.serper.dev/search" # Switched from 'news' to 'search' for broader results
+                    
+                    # More aggressive search query
+                    query = f'"{selected_acc}" news expansion partnership 2025 2026'
+                    res = requests.post(url, json={"q": query}, headers={'X-API-KEY': api_key})
+                    
+                    # Look in 'organic' results if 'news' is empty
+                    results = res.json()
+                    search_hits = results.get("organic", [])
+                    
+                    if search_hits:
+                        st.success(f"Found {len(search_hits)} potential hooks:")
+                        for item in search_hits[:4]: # Show top 4
+                            st.markdown(f"**{item.get('title')}**")
+                            st.write(item.get('snippet'))
+                            st.caption(f"[Read Source]({item.get('link')})")
+                            st.divider()
                     else:
-                        st.info("No specific news found. Check LinkedIn for updates.")
+                        st.info(f"The web is quiet on {selected_acc}. Try searching for their parent company?")
                 except Exception as e:
                     st.error(f"Agent Error: {e}")
 
@@ -67,7 +71,6 @@ else:
         subj = f"Strategy for {selected_acc}"
         body = f"Hi,\n\nI was looking into {selected_acc} and wanted to share this video regarding your electricity rate database.\n\nBest,\nLeke"
         mailto = f"mailto:?subject={urllib.parse.quote(subj)}&body={urllib.parse.quote(body)}"
-        # Fixed the missing quote here that caused the SyntaxError
         btn_html = f'<a href="{mailto}" style="display:inline-block;width:100%;text-align:center;padding:10px;background:#ff4b4b;color:white;border-radius:5px;text-decoration:none;">📧 Create Email Draft</a>'
         st.markdown(btn_html, unsafe_allow_html=True)
 
