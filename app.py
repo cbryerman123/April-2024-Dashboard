@@ -8,7 +8,6 @@ import requests
 # 1. Page Config - MUST be first
 st.set_page_config(page_title="AI Sales Command Center", layout="wide")
 
-# Ensure this matches your GitHub filename exactly
 file_path = "LEKE FOCUS FOR MARCH - Sheet1.csv"
 
 # --- DATA LOADING ---
@@ -55,40 +54,66 @@ else:
         c3.link_button("📍 Maps", map_url, use_container_width=True)
         
         if st.button(f"Run News Agent", use_container_width=True):
-            if "SERPER_API_KEY" not in st.secrets:
-                st.warning("Add SERPER_API_KEY to Streamlit Secrets!")
-            else:
+            if "SERPER_API_KEY" in st.secrets:
                 try:
                     url = "https://google.serper.dev/search"
                     headers = {'X-API-KEY': st.secrets["SERPER_API_KEY"]}
-                    q = f'"{selected_acc}" news expansion energy'
+                    q = f'"{selected_acc}" news expansion energy 2026'
                     res = requests.post(url, json={"q": q}, headers=headers)
                     hits = res.json().get("organic", [])
                     if hits:
                         for h in hits[:3]:
                             st.info(f"**{h.get('title')}**\n\n{h.get('snippet')}")
-                    else:
-                        st.write("No news found. Try LinkedIn!")
-                except Exception as e:
-                    st.error(f"Error: {e}")
+                    else: st.write("No news found.")
+                except Exception as e: st.error(f"Error: {e}")
+            else: st.warning("Add API Key!")
 
     with col_out:
         st.subheader("📧 Outreach Generator")
-        hook = st.radio("Strategy:", ["Permit Hook", "Video", "General"])
+        hook = st.radio("Strategy:", ["Permit Hook", "Social Mention", "Video"], horizontal=True)
         
         if hook == "Permit Hook":
             subj = f"Upgrades at {selected_acc}"
-            body = f"Hi,\n\nI noticed recent upgrades at {selected_acc}. These changes often mean you qualify for a better utility rate. Let's chat.\n\nBest,\nLeke"
-        elif hook == "Video":
-            subj = f"Rate Video for {selected_acc}"
-            body = f"Hi,\n\nHere is a video showing our electricity rate database for {selected_acc} locations.\n\n[LINK]\n\nBest,\nLeke"
+            body = f"Hi,\n\nI noticed recent upgrades at {selected_acc}. Usually, that triggers a rate review. Let's chat.\n\nBest,\nLeke"
+        elif hook == "Social Mention":
+            subj = f"Question about {selected_acc} chatter"
+            body = f"Hi,\n\nI saw some recent discussions regarding {selected_acc} facilities online. It sparked a question about your energy load management...\n\nBest,\nLeke"
         else:
-            subj = f"Efficiency for {selected_acc}"
-            body = f"Hi,\n\nI'd love to connect regarding energy costs at {selected_acc}...\n\nBest,\nLeke"
+            subj = f"Rate Video for {selected_acc}"
+            body = f"Hi,\n\nHere is a video of our rate database for {selected_acc} locations.\n\n[LINK]\n\nBest,\nLeke"
 
         mailto = f"mailto:?subject={urllib.parse.quote(subj)}&body={urllib.parse.quote(body)}"
-        btn_code = f'<a href="{mailto}" style="display:inline-block;width:100%;text-align:center;padding:12px;background:#ff4b4b;color:white;border-radius:8px;text-decoration:none;font-weight:bold;">📧 Draft Email</a>'
-        st.markdown(btn_code, unsafe_allow_html=True)
+        st.markdown(f'<a href="{mailto}" style="display:inline-block;width:100%;text-align:center;padding:12px;background:#ff4b4b;color:white;border-radius:8px;text-decoration:none;font-weight:bold;">📧 Draft Email</a>', unsafe_allow_html=True)
+
+    # --- NEW: THE MENTION MAP (SOCIAL SIGNALS) ---
+    st.divider()
+    st.subheader("🌐 Mention Map (Reddit & X Signals)")
+    m1, m2 = st.columns([2, 1])
+
+    with m1:
+        if st.button(f"🛰️ Scan Social Mentions for {selected_acc}", use_container_width=True):
+            if "SERPER_API_KEY" in st.secrets:
+                with st.spinner("Scanning Reddit and X..."):
+                    try:
+                        # Targeted search for social chatter
+                        q_m = f'"{selected_acc}" (site:reddit.com OR site:x.com) energy outage expansion refrigeration'
+                        r_m = requests.post("https://google.serper.dev/search", 
+                                          json={"q": q_m}, 
+                                          headers={'X-API-KEY': st.secrets["SERPER_API_KEY"]})
+                        res_m = r_m.json().get("organic", [])
+                        if res_m:
+                            for m in res_m[:3]:
+                                st.success(f"📌 {m.get('title')}")
+                                st.write(m.get('snippet'))
+                                st.caption(f"[View Discussion]({m.get('link')})")
+                                st.divider()
+                        else: st.info("No recent social mentions found for this criteria.")
+                    except Exception as e: st.error(f"Error: {e}")
+            else: st.warning("API Key missing!")
+
+    with m2:
+        st.markdown("**Why use this?**")
+        st.caption("Reddit and X are where employees and customers post the truth. Look for mentions of 'Power outage,' 'New store,' or 'Old HVAC' to use as high-value hooks.")
 
     # --- MIDDLE ROW: PHYSICAL SIGNALS ---
     st.divider()
@@ -100,7 +125,7 @@ else:
             if "SERPER_API_KEY" in st.secrets:
                 with st.spinner("Searching..."):
                     try:
-                        q_p = f"{selected_acc} municipal permit refrigeration HVAC"
+                        q_p = f"{selected_acc} municipal permit refrigeration HVAC construction"
                         r_p = requests.post("https://google.serper.dev/search", json={"q": q_p}, headers={'X-API-KEY': st.secrets["SERPER_API_KEY"]})
                         res_p = r_p.json().get("organic", [])
                         if res_p:
@@ -110,7 +135,6 @@ else:
                                 st.divider()
                         else: st.info("No snippets found.")
                     except Exception as e: st.error(f"Error: {e}")
-            else: st.warning("API Key missing!")
         
     with p_col2:
         bz_url = f"https://www.google.com/search?q=site:buildzoom.com {urllib.parse.quote(selected_acc)}"
