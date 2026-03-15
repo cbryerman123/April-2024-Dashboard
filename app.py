@@ -5,12 +5,12 @@ from datetime import date
 import urllib.parse
 import requests
 
-# 1. Page Config (Must be the absolute first line)
+# 1. Page Config (MUST be the absolute first line)
 st.set_page_config(page_title="AI Sales Command Center", layout="wide")
 
 file_path = "LEKE FOCUS FOR MARCH - Sheet1.csv"
 
-# --- DATA LOADING ---
+# --- DATA LOADING & PERSISTENCE ---
 def load_data():
     if not os.path.exists(file_path):
         return [], []
@@ -18,10 +18,13 @@ def load_data():
         reader = csv.DictReader(f)
         data = [row for row in reader if any(row.values())]
         cols = [c.strip() for c in reader.fieldnames] if reader.fieldnames else []
-    # Ensure tracking columns exist
+    
+    # Ensure tracking columns exist in the system
     for c in ['Last Outreach', 'Status', 'Notes']:
-        if c not in cols: cols.append(c)
-    # Fill defaults for rows
+        if c not in cols:
+            cols.append(c)
+            
+    # Fill defaults for existing rows
     for row in data:
         if not row.get('Status'): row['Status'] = 'Not Started'
         if not row.get('Last Outreach'): row['Last Outreach'] = 'None'
@@ -36,9 +39,9 @@ st.title("🤖 AI Sales Command Center")
 if not data:
     st.error(f"⚠️ CSV file not found or empty: {file_path}")
 else:
+    # We use the first column (usually 'Account') as the primary key
     name_col = cols[0]
-    # Selection of account
-    selected_acc = st.selectbox("🎯 Target Account", [r[name_col].strip() for r in data])
+    selected_acc = st.selectbox("🎯 Select Target Account", [r[name_col].strip() for r in data])
 
     st.divider()
 
@@ -48,7 +51,7 @@ else:
     with col_research:
         st.subheader("🔍 Account Intelligence")
         
-        # Quick Intelligence Buttons
+        # Quick-Link Action Row
         c1, c2, c3 = st.columns(3)
         li_posts_url = f"https://www.linkedin.com/search/results/content/?keywords={urllib.parse.quote(selected_acc)}"
         finance_url = f"https://www.google.com/finance/quote/{urllib.parse.quote(selected_acc)}"
@@ -68,7 +71,7 @@ else:
                 try:
                     api_key = st.secrets["SERPER_API_KEY"]
                     url = "https://google.serper.dev/search"
-                    query = f'"{selected_acc}" news expansion partnership 2025 2026'
+                    query = f'"{selected_acc}" news expansion partnership energy 2026'
                     res = requests.post(url, json={"q": query}, headers={'X-API-KEY': api_key})
                     search_hits = res.json().get("organic", [])
                     
@@ -76,70 +79,22 @@ else:
                         for item in search_hits[:3]:
                             st.info(f"**{item.get('title')}**\n\n{item.get('snippet')}")
                     else:
-                        st.write("No specific recent news found. Try the LinkedIn button!")
+                        st.write("No specific recent news found. Use the LinkedIn button above!")
                 except Exception as e:
                     st.error(f"Agent Error: {e}")
 
     with col_outreach:
-        st.subheader("📧 Outreach Generator")
+        st.subheader("📧 Intelligence-Led Outreach")
         
-        # Selection of the 'Hook'
-        hook_type = st.radio("Choose your Hook Type:", ["Permit/Upgrade Hook", "Electricity Rate Video", "General Discovery"])
+        # Dynamic Hook Selection
+        hook_type = st.radio("Choose Outreach Strategy:", ["Permit/Upgrade Hook", "Electricity Rate Video", "General Discovery"])
         
         if hook_type == "Permit/Upgrade Hook":
-            subj = f"Question regarding refrigeration upgrades at {selected_acc}"
-            body = f"Hi,\n\nI was looking into {selected_acc} and noticed some recent physical upgrades. Usually, when equipment changes at this scale, your utility rate class needs a manual review to avoid overpaying.\n\nI'd love to share how our database handles this for your specific zones.\n\nBest,\nLeke"
+            subj = f"Question regarding recent upgrades at {selected_acc}"
+            body = f"Hi,\n\nI was looking into {selected_acc} and noticed some recent mechanical/facility upgrades. Usually, when equipment changes at this scale, your utility rate class needs a manual review to avoid overpaying. I'd love to share how our database handles this for your zones.\n\nBest,\nLeke"
         elif hook_type == "Electricity Rate Video":
             subj = f"Rate Database Video for {selected_acc}"
             body = f"Hi,\n\nI thought you'd find this useful. Here is a quick video showing our current electricity rate database for {selected_acc} locations.\n\n[LINK TO VIDEO]\n\nBest,\nLeke"
         else:
-            subj = f"Optimizing efficiency for {selected_acc}"
-            body = f"Hi,\n\nI'd love to connect regarding how we are helping companies like {selected_acc} navigate shifting utility costs...\n\nBest,\nLeke"
-
-        mailto_link = f"mailto:?subject={urllib.parse.quote(subj)}&body={urllib.parse.quote(body)}"
-        btn_html = f'<a href="{mailto_link}" style="display:inline-block;width:100%;text-align:center;padding:12px;background:#ff4b4b;color:white;border-radius:8px;text-decoration:none;font-weight:bold;">📧 Create Email Draft</a>'
-        st.markdown(btn_html, unsafe_allow_html=True)
-
-    # --- MIDDLE ROW: PHYSICAL SIGNALS (PERMITS) ---
-    st.divider()
-    st.subheader("🏗️ Physical Signals & Permits")
-    p_col1, p_col2 = st.columns(2)
-
-    with p_col1:
-        permit_query = f"{selected_acc} municipal permit refrigeration HVAC construction"
-        permit_url = f"https://www.google.com/search?q={urllib.parse.quote(permit_query)}"
-        st.link_button(f"🔎 Check Municipal Permits", permit_url, use_container_width=True)
-        st.caption("Look for: HVAC, Refrigeration, or Solar permits.")
-
-    with p_col2:
-        bz_query = f"site:buildzoom.com {selected_acc}"
-        bz_url = f"https://www.google.com/search?q={urllib.parse.quote(bz_query)}"
-        st.link_button(f"🏗️ View BuildZoom History", bz_url, use_container_width=True)
-        st.caption("Aggregated construction data and contractor history.")
-
-    # --- BOTTOM ROW: TRACKER & DATABASE ---
-    st.divider()
-    st.subheader("📝 Activity Tracker")
-    with st.form("update_activity"):
-        t_col1, t_col2 = st.columns(2)
-        with t_col1:
-            status = st.selectbox("New Status", ["Not Started", "Email Sent", "Call Made", "Conversation Had", "Meeting Booked"])
-        with t_col2:
-            notes = st.text_input("Log Notes")
-        
-        if st.form_submit_button("Update Activity Log"):
-            for row in data:
-                if row[name_col].strip() == selected_acc:
-                    row['Last Outreach'] = str(date.today())
-                    row['Status'] = status
-                    row['Notes'] = notes
-            
-            with open(file_path, mode='w', newline='', encoding='utf-8') as f:
-                writer = csv.DictWriter(f, fieldnames=cols)
-                writer.writeheader()
-                writer.writerows(data)
-            st.success(f"Log Updated for {selected_acc}!")
-            st.rerun()
-
-    st.subheader("📊 Full Prospect Database")
-    st.dataframe(data, use_container_width=True)
+            subj = f"Utility cost optimization for {selected_acc}"
+            body =
