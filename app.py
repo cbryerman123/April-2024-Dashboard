@@ -5,7 +5,7 @@ from datetime import date
 import urllib.parse
 import requests
 
-# 1. Page Config (Must be the first Streamlit command)
+# 1. Page Config (Must be the absolute first line)
 st.set_page_config(page_title="AI Sales Command Center", layout="wide")
 
 file_path = "LEKE FOCUS FOR MARCH - Sheet1.csv"
@@ -83,7 +83,7 @@ else:
     with col_outreach:
         st.subheader("📧 Outreach Generator")
         
-        # Selection of the 'Hook' - FIX: Parentheses correctly closed
+        # Selection of the 'Hook'
         hook_type = st.radio("Choose your Hook Type:", ["Permit/Upgrade Hook", "Electricity Rate Video", "General Discovery"])
         
         if hook_type == "Permit/Upgrade Hook":
@@ -96,4 +96,50 @@ else:
             subj = f"Optimizing efficiency for {selected_acc}"
             body = f"Hi,\n\nI'd love to connect regarding how we are helping companies like {selected_acc} navigate shifting utility costs...\n\nBest,\nLeke"
 
-        mailto = f"mailto:?subject={urllib.parse.quote(subj)}
+        mailto_link = f"mailto:?subject={urllib.parse.quote(subj)}&body={urllib.parse.quote(body)}"
+        btn_html = f'<a href="{mailto_link}" style="display:inline-block;width:100%;text-align:center;padding:12px;background:#ff4b4b;color:white;border-radius:8px;text-decoration:none;font-weight:bold;">📧 Create Email Draft</a>'
+        st.markdown(btn_html, unsafe_allow_html=True)
+
+    # --- MIDDLE ROW: PHYSICAL SIGNALS (PERMITS) ---
+    st.divider()
+    st.subheader("🏗️ Physical Signals & Permits")
+    p_col1, p_col2 = st.columns(2)
+
+    with p_col1:
+        permit_query = f"{selected_acc} municipal permit refrigeration HVAC construction"
+        permit_url = f"https://www.google.com/search?q={urllib.parse.quote(permit_query)}"
+        st.link_button(f"🔎 Check Municipal Permits", permit_url, use_container_width=True)
+        st.caption("Look for: HVAC, Refrigeration, or Solar permits.")
+
+    with p_col2:
+        bz_query = f"site:buildzoom.com {selected_acc}"
+        bz_url = f"https://www.google.com/search?q={urllib.parse.quote(bz_query)}"
+        st.link_button(f"🏗️ View BuildZoom History", bz_url, use_container_width=True)
+        st.caption("Aggregated construction data and contractor history.")
+
+    # --- BOTTOM ROW: TRACKER & DATABASE ---
+    st.divider()
+    st.subheader("📝 Activity Tracker")
+    with st.form("update_activity"):
+        t_col1, t_col2 = st.columns(2)
+        with t_col1:
+            status = st.selectbox("New Status", ["Not Started", "Email Sent", "Call Made", "Conversation Had", "Meeting Booked"])
+        with t_col2:
+            notes = st.text_input("Log Notes")
+        
+        if st.form_submit_button("Update Activity Log"):
+            for row in data:
+                if row[name_col].strip() == selected_acc:
+                    row['Last Outreach'] = str(date.today())
+                    row['Status'] = status
+                    row['Notes'] = notes
+            
+            with open(file_path, mode='w', newline='', encoding='utf-8') as f:
+                writer = csv.DictWriter(f, fieldnames=cols)
+                writer.writeheader()
+                writer.writerows(data)
+            st.success(f"Log Updated for {selected_acc}!")
+            st.rerun()
+
+    st.subheader("📊 Full Prospect Database")
+    st.dataframe(data, use_container_width=True)
