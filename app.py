@@ -1,69 +1,77 @@
-# 1. Setup and Configuration
+import csv
+import os
+from datetime import date
+import streamlit as st
+
 st.set_page_config(page_title="BDR Activity Dashboard", layout="wide")
 file_path = "LEKE FOCUS FOR MARCH - Sheet1.csv"
 
-# 2. Load the Data
+# Load the data using built-in Python tools (No Pandas needed!)
 def load_data():
-    if os.path.exists(file_path):
-        df = pd.read_csv(file_path)
-        
-        # Automatically add tracking columns if they aren't in the CSV yet
-        if 'Last Outreach' not in df.columns:
-            df['Last Outreach'] = 'None'
-        if 'Status' not in df.columns:
-            df['Status'] = 'Not Started'
-        if 'Notes' not in df.columns:
-            df['Notes'] = ''
-            
-        return df
-    else:
-        st.error(f"Could not find {file_path}. Please make sure it's in the same folder.")
+    if not os.path.exists(file_path):
+        st.error(f"Could not find {file_path}")
         st.stop()
+        
+    with open(file_path, mode='r', encoding='utf-8-sig') as file:
+        reader = csv.DictReader(file)
+        data = list(reader)
+        fieldnames = list(reader.fieldnames) if reader.fieldnames else []
+        
+    # Add our tracking columns if they don't exist
+    if 'Last Outreach' not in fieldnames: fieldnames.append('Last Outreach')
+    if 'Status' not in fieldnames: fieldnames.append('Status')
+    if 'Notes' not in fieldnames: fieldnames.append('Notes')
+    
+    for row in data:
+        if 'Last Outreach' not in row: row['Last Outreach'] = 'None'
+        if 'Status' not in row: row['Status'] = 'Not Started'
+        if 'Notes' not in row: row['Notes'] = ''
+        
+    return data, fieldnames
 
-df = load_data()
+data, fieldnames = load_data()
 
-# 3. Dashboard Header & Metrics
+# Dashboard Header & Metrics
 st.title("🚀 Leke's March Focus: BDR Dashboard")
 
-# Calculate metrics
-total_accounts = len(df)
-contacted_accounts = len(df[df['Status'] != 'Not Started'])
+total_accounts = len(data)
+contacted_accounts = sum(1 for row in data if row.get('Status', 'Not Started') != 'Not Started')
 
 cols = st.columns(3)
 cols[0].metric("Total Target Accounts", total_accounts)
 cols[1].metric("Accounts Contacted", contacted_accounts)
 cols[2].metric("Remaining to Contact", total_accounts - contacted_accounts)
 
-# 4. The Interactive List
+# The Interactive List
 st.subheader("Current Priority List")
-# Display the dataframe nicely
-st.dataframe(df, use_container_width=True)
+st.dataframe(data, use_container_width=True)
 
-# 5. BDR Update Form (Data Entry)
+# BDR Update Form (Data Entry)
 st.divider()
 st.subheader("Log New Activity")
 
+# Get unique accounts for the dropdown
+accounts = list(set(row['Account'] for row in data if row.get('Account')))
+
 with st.form("update_form"):
-    # BDR selects the account they just worked on
-    selected_account = st.selectbox("Select Account", df['Account'].dropna().unique())
-    
-    # BDR logs what happened
+    selected_account = st.selectbox("Select Account", accounts)
     new_status = st.selectbox("Activity Status", ["Email Sent", "Call Made", "Meeting Booked", "Follow Up Needed"])
     new_notes = st.text_area("Activity Notes (What happened?)")
-    
     submit = st.form_submit_button("Update Record")
 
     if submit:
-        # 6. Update the DataFrame
-        # Find the row for the selected account and update the values
-        df.loc[df['Account'] == selected_account, 'Last Outreach'] = str(date.today())
-        df.loc[df['Account'] == selected_account, 'Status'] = new_status
+        # Update the data
+        for row in data:
+            if row.get('Account') == selected_account:
+                row['Last Outreach'] = str(date.today())
+                row['Status'] = new_status
+                row['Notes'] = new_notes
         
-        # Append new notes to existing notes if needed, or just overwrite
-        df.loc[df['Account'] == selected_account, 'Notes'] = new_notes
-        
-        # Save back to the CSV file so it remembers the changes!
-        df.to_csv(file_path, index=False)
+        # Save back to the CSV file
+        with open(file_path, mode='w', newline='', encoding='utf-8') as file:
+            writer = csv.DictWriter(file, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(data)
         
         st.success(f"✅ Successfully logged activity for {selected_account}!")
-        st.rerun() # Refreshes the app to show the new data
+        st.rerun()
