@@ -5,12 +5,13 @@ from datetime import date
 import urllib.parse
 import requests
 
-# 1. Page Config (MUST be the absolute first line)
+# 1. Page Config - MUST be the first line
 st.set_page_config(page_title="AI Sales Command Center", layout="wide")
 
+# Ensure the filename matches exactly what is in your GitHub
 file_path = "LEKE FOCUS FOR MARCH - Sheet1.csv"
 
-# --- DATA LOADING & PERSISTENCE ---
+# --- DATA LOADING ---
 def load_data():
     if not os.path.exists(file_path):
         return [], []
@@ -19,12 +20,12 @@ def load_data():
         data = [row for row in reader if any(row.values())]
         cols = [c.strip() for c in reader.fieldnames] if reader.fieldnames else []
     
-    # Ensure tracking columns exist in the system
+    # Ensure tracking columns exist
     for c in ['Last Outreach', 'Status', 'Notes']:
         if c not in cols:
             cols.append(c)
             
-    # Fill defaults for existing rows
+    # Fill defaults for rows
     for row in data:
         if not row.get('Status'): row['Status'] = 'Not Started'
         if not row.get('Last Outreach'): row['Last Outreach'] = 'None'
@@ -37,64 +38,62 @@ data, cols = load_data()
 st.title("🤖 AI Sales Command Center")
 
 if not data:
-    st.error(f"⚠️ CSV file not found or empty: {file_path}")
+    st.error(f"⚠️ Could not find your CSV file: {file_path}. Please check your GitHub file name.")
 else:
-    # We use the first column (usually 'Account') as the primary key
+    # Use the first column as the Account name
     name_col = cols[0]
-    selected_acc = st.selectbox("🎯 Select Target Account", [r[name_col].strip() for r in data])
+    selected_acc = st.selectbox("🎯 Target Account", [r[name_col].strip() for r in data])
 
     st.divider()
 
-    # --- TOP ROW: DEEP INTELLIGENCE & RESEARCH ---
+    # --- TOP ROW: RESEARCH & OUTREACH ---
     col_research, col_outreach = st.columns(2)
 
     with col_research:
         st.subheader("🔍 Account Intelligence")
         
-        # Quick-Link Action Row
+        # Action Buttons
         c1, c2, c3 = st.columns(3)
-        li_posts_url = f"https://www.linkedin.com/search/results/content/?keywords={urllib.parse.quote(selected_acc)}"
-        finance_url = f"https://www.google.com/finance/quote/{urllib.parse.quote(selected_acc)}"
-        maps_url = f"https://www.google.com/maps/search/{urllib.parse.quote(selected_acc)}"
+        li_url = f"https://www.linkedin.com/search/results/content/?keywords={urllib.parse.quote(selected_acc)}"
+        fin_url = f"https://www.google.com/finance/quote/{urllib.parse.quote(selected_acc)}"
+        map_url = f"https://www.google.com/maps/search/{urllib.parse.quote(selected_acc)}"
         
-        c1.link_button("📱 LI Activity", li_posts_url, use_container_width=True)
-        c2.link_button("📈 Financials", finance_url, use_container_width=True)
-        c3.link_button("📍 Map Locations", maps_url, use_container_width=True)
+        c1.link_button("📱 LI Posts", li_url, use_container_width=True)
+        c2.link_button("📈 Market", fin_url, use_container_width=True)
+        c3.link_button("📍 Maps", map_url, use_container_width=True)
         
         st.write("")
         
         # AI News Agent
-        if st.button(f"Run AI News Agent for {selected_acc}", use_container_width=True):
+        if st.button(f"Run News Agent for {selected_acc}", use_container_width=True):
             if "SERPER_API_KEY" not in st.secrets:
-                st.warning("API Key missing from Streamlit Secrets.")
+                st.warning("API Key missing from Secrets.")
             else:
                 try:
                     api_key = st.secrets["SERPER_API_KEY"]
+                    # Using 'search' endpoint for broader results
                     url = "https://google.serper.dev/search"
-                    query = f'"{selected_acc}" news expansion partnership energy 2026'
-                    res = requests.post(url, json={"q": query}, headers={'X-API-KEY': api_key})
-                    search_hits = res.json().get("organic", [])
+                    payload = {"q": f'"{selected_acc}" news expansion partnership energy'}
+                    res = requests.post(url, json=payload, headers={'X-API-KEY': api_key})
+                    hits = res.json().get("organic", [])
                     
-                    if search_hits:
-                        for item in search_hits[:3]:
+                    if hits:
+                        for item in hits[:3]:
                             st.info(f"**{item.get('title')}**\n\n{item.get('snippet')}")
                     else:
-                        st.write("No specific recent news found. Use the LinkedIn button above!")
+                        st.write("No specific recent news found. Try the LinkedIn button.")
                 except Exception as e:
                     st.error(f"Agent Error: {e}")
 
     with col_outreach:
-        st.subheader("📧 Intelligence-Led Outreach")
+        st.subheader("📧 Outreach Generator")
         
-        # Dynamic Hook Selection
-        hook_type = st.radio("Choose Outreach Strategy:", ["Permit/Upgrade Hook", "Electricity Rate Video", "General Discovery"])
+        # Outreach Hook Selection
+        hook = st.radio("Strategy:", ["Permit Hook", "Video Resource", "General Discovery"])
         
-        if hook_type == "Permit/Upgrade Hook":
-            subj = f"Question regarding recent upgrades at {selected_acc}"
-            body = f"Hi,\n\nI was looking into {selected_acc} and noticed some recent mechanical/facility upgrades. Usually, when equipment changes at this scale, your utility rate class needs a manual review to avoid overpaying. I'd love to share how our database handles this for your zones.\n\nBest,\nLeke"
-        elif hook_type == "Electricity Rate Video":
+        if hook == "Permit Hook":
+            subj = f"Question regarding upgrades at {selected_acc}"
+            body = f"Hi,\n\nI was looking into {selected_acc} and noticed some recent facility upgrades. Usually, when equipment changes at this scale, your utility rate class needs a review to avoid overpaying. Let's chat about your specific zones.\n\nBest,\nLeke"
+        elif hook == "Video Resource":
             subj = f"Rate Database Video for {selected_acc}"
-            body = f"Hi,\n\nI thought you'd find this useful. Here is a quick video showing our current electricity rate database for {selected_acc} locations.\n\n[LINK TO VIDEO]\n\nBest,\nLeke"
-        else:
-            subj = f"Utility cost optimization for {selected_acc}"
-            body =
+            body = f"Hi,\n\nI thought you'd
