@@ -3,15 +3,37 @@ import os
 from datetime import date
 import streamlit as st
 import urllib.parse
+import requests
+from bs4 import BeautifulSoup
 
-st.set_page_config(page_title="BDR Sales Command Center", layout="wide")
+st.set_page_config(page_title="AI Sales Command Center", layout="wide")
 file_path = "LEKE FOCUS FOR MARCH - Sheet1.csv"
 
-# --- HELPER FUNCTIONS ---
+# --- AGENT FUNCTION: Research the Company ---
+def research_company(company_name):
+    try:
+        # This is a 'Mini-Agent' that scrapes Google News for the company
+        search_url = f"https://www.google.com/search?q={urllib.parse.quote(company_name)}+news&tbm=nws"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        response = requests.get(search_url, headers=headers)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        articles = []
+        for item in soup.find_all('div', limit=3): # Get top 3 headlines
+            title = item.find('div', attrs={'role': 'heading'})
+            if title:
+                articles.append(title.get_text())
+        
+        if not articles:
+            return "No recent news found. Try a manual search."
+        return "\n\n".join([f"• {a}" for a in articles])
+    except:
+        return "Research Agent is currently offline. Check connection."
+
+# --- DATA LOADING ---
 def load_data():
     if not os.path.exists(file_path):
-        st.error(f"Could not find {file_path}")
-        st.stop()
+        st.error(f"Could not find {file_path}"); st.stop()
     with open(file_path, mode='r', encoding='utf-8-sig') as file:
         reader = csv.DictReader(file)
         data = [row for row in reader if any(row.values())]
@@ -23,64 +45,39 @@ def load_data():
 data, fieldnames = load_data()
 name_col = fieldnames[0]
 
-# --- DASHBOARD UI ---
-st.title("🚀 BDR Sales Command Center")
+# --- UI LAYOUT ---
+st.title("🤖 AI Sales Command Center")
 
-# Search/Filter Bar
-search_query = st.text_input("🔍 Quick Search Accounts", "")
-filtered_data = [row for row in data if search_query.lower() in row[name_col].lower()]
+# 1. Selection Row
+selected_acc = st.selectbox("Select Account to Target", [row[name_col] for row in data if row.get(name_col)])
 
-st.subheader("Target List")
-st.dataframe(filtered_data, use_container_width=True)
-
+# 2. The AI Agent Section
 st.divider()
+col_research, col_email = st.columns([1, 1])
 
-# --- THE MAGIC PART: EMAIL GENERATOR ---
-col1, col2 = st.columns(2)
+with col_research:
+    st.subheader(f"🔍 AI Research: {selected_acc}")
+    if st.button(f"Run Agent Research for {selected_acc}"):
+        with st.spinner("Agent is searching the web..."):
+            results = research_company(selected_acc)
+            st.markdown(f"**Latest News & Hooks:**\n\n{results}")
+            st.caption("Use these as 'Hooks' in your outreach today.")
+    else:
+        st.info("Click the button above to have the AI Agent find today's talking points.")
 
-with col1:
-    st.subheader("1. Log Activity")
-    account_names = [row[name_col] for row in data if row.get(name_col) and row[name_col].strip()]
+with col_email:
+    st.subheader("📧 Intelligence-Led Outreach")
+    resource = st.selectbox("Topic", ["Electricity Rate Database", "Cost Reduction", "General Follow-up"])
     
-    with st.form("update_form"):
-        selected_acc = st.selectbox("Select Account", account_names)
-        new_status = st.selectbox("Status", ["Email Sent", "Call Made", "Meeting Booked", "Nurturing"])
-        new_notes = st.text_area("Notes")
-        if st.form_submit_button("Save Update"):
-            for row in data:
-                if row.get(name_col) == selected_acc:
-                    row['Last Outreach'] = str(date.today()); row['Status'] = new_status; row['Notes'] = new_notes
-            with open(file_path, mode='w', newline='', encoding='utf-8') as file:
-                writer = csv.DictWriter(file, fieldnames=fieldnames)
-                writer.writeheader(); writer.writerows(data)
-            st.success("Saved!"); st.rerun()
-
-with col2:
-    st.subheader("2. Send Resources")
-    resource = st.selectbox("Choose Resource to Send", ["Electricity Rate Database Video", "General Introduction", "Case Study"])
+    # Simple Logic: Personalize based on selection
+    subject = f"Question for {selected_acc} team"
+    body = f"Hi,\n\nI was just looking into {selected_acc} and noticed some interesting trends in the energy market. I thought you'd appreciate this video on the Electricity Rate Database...\n\nBest,\nLeke"
     
-    # Define your templates here
-    templates = {
-        "Electricity Rate Database Video": {
-            "subject": f"Quick question regarding electricity rates at {selected_acc}",
-            "body": f"Hi,\n\nI thought you might find this useful. Here is a quick video of our signal showing the electricity rate database for {selected_acc}.\n\n[LINK TO VIDEO HERE]\n\nBest,\nLeke"
-        },
-        "General Introduction": {
-            "subject": "Improving efficiency",
-            "body": "Hi,\n\nI'd love to connect regarding your current processes..."
-        }
-    }
+    st.text_area("Draft Preview", body, height=150)
+    mailto = f"mailto:?subject={urllib.parse.quote(subject)}&body={urllib.parse.quote(body)}"
+    st.markdown(f'<a href="{mailto}" style="display:inline-block;padding:10px;background-color:#ff4b4b;color:white;border-radius:5px;text-decoration:none;">Generate Email Draft</a>', unsafe_allow_html=True)
 
-    selected_template = templates.get(resource, {"subject": "", "body": ""})
-    
-    # Show preview
-    st.info(f"**Previewing Email for:** {selected_acc}")
-    st.text_area("Subject Line", selected_template['subject'])
-    st.text_area("Body Preview", selected_template['body'], height=150)
-
-    # Create the Mailto Link
-    subject_enc = urllib.parse.quote(selected_template['subject'])
-    body_enc = urllib.parse.quote(selected_template['body'])
-    mailto_link = f"mailto:?subject={subject_enc}&body={body_enc}"
-    
-    st.markdown(f'<a href="{mailto_link}" style="display: inline-block; padding: 12px 20px; background-color: #ff4b4b; color: white; text-align: center; text-decoration: none; font-size: 16px; border-radius: 8px;">📧 Open in Outlook / Gmail</a>', unsafe_allow_input=True, unsafe_allow_html=True)
+# 3. Data Table at the bottom
+st.divider()
+st.subheader("Full Tracking Database")
+st.dataframe(data, use_container_width=True)
