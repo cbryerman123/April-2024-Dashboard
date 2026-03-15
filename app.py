@@ -14,52 +14,50 @@ def load_data():
     with open(file_path, mode='r', encoding='utf-8-sig') as file:
         reader = csv.DictReader(file)
         data = list(reader)
-        # We are going to get the REAL names of your columns here
         fieldnames = [f.strip() for f in reader.fieldnames] if reader.fieldnames else []
         
+    # Ensure tracking columns exist
     for col in ['Last Outreach', 'Status', 'Notes']:
         if col not in fieldnames:
             fieldnames.append(col)
     
-    clean_data = []
-    for row in data:
-        clean_row = {k.strip(): v for k, v in row.items() if k}
-        for col in fieldnames:
-            if col not in clean_row: clean_row[col] = ''
-        if not clean_row.get('Status'): clean_row['Status'] = 'Not Started'
-        clean_data.append(clean_row)
-        
-    return clean_data, fieldnames
+    return data, fieldnames
 
 data, fieldnames = load_data()
 
 st.title("🚀 Leke's March Focus: BDR Dashboard")
 
-# --- THIS PART IS THE FIX ---
-# This shows us exactly what columns the computer sees
-st.write("Debug: Your file columns are:", fieldnames)
+# DETECTIVE WORK: Find the first column that isn't empty
+# We'll skip the columns that are just "" and find the one with the names
+real_data_col = None
+for col in fieldnames:
+    if col != "" and col not in ['Last Outreach', 'Status', 'Notes']:
+        real_data_col = col
+        break
 
-st.subheader("Full Prospect List")
+# If we still can't find it, we'll just use the very first column
+if not real_data_col:
+    real_data_col = fieldnames[0]
+
+# Display Table
+st.subheader(f"Project List (Tracking by: {real_data_col})")
 st.dataframe(data, use_container_width=True)
 
 st.divider()
 st.subheader("Update Activity")
 
-# We will try to find the Account column. If it's not named 'Account', 
-# we will just use the very first column in your file.
-account_col = next((f for f in fieldnames if f.lower() == 'account'), fieldnames[0])
-
-account_names = [row[account_col] for row in data if row.get(account_col)]
+# Dropdown Menu
+account_names = [row[real_data_col] for row in data if row.get(real_data_col)]
 
 with st.form("update_form"):
-    selected_account = st.selectbox(f"Select from {account_col}", account_names)
+    selected_account = st.selectbox(f"Select {real_data_col}", account_names)
     new_status = st.selectbox("Activity Status", ["Email Sent", "Call Made", "Conversation Had", "Meeting Booked"])
     new_notes = st.text_area("Notes")
     submit = st.form_submit_button("Save Update")
 
     if submit:
         for row in data:
-            if row.get(account_col) == selected_account:
+            if row.get(real_data_col) == selected_account:
                 row['Last Outreach'] = str(date.today())
                 row['Status'] = new_status
                 row['Notes'] = new_notes
