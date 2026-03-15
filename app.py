@@ -83,5 +83,17 @@ else:
     with col_outreach:
         st.subheader("📧 Outreach Generator")
         
-        # Selection of the 'Hook'
-        hook_type = st.radio("Choose your Hook Type:",
+        # Selection of the 'Hook' - FIX: Parentheses correctly closed
+        hook_type = st.radio("Choose your Hook Type:", ["Permit/Upgrade Hook", "Electricity Rate Video", "General Discovery"])
+        
+        if hook_type == "Permit/Upgrade Hook":
+            subj = f"Question regarding refrigeration upgrades at {selected_acc}"
+            body = f"Hi,\n\nI was looking into {selected_acc} and noticed some recent physical upgrades. Usually, when equipment changes at this scale, your utility rate class needs a manual review to avoid overpaying.\n\nI'd love to share how our database handles this for your specific zones.\n\nBest,\nLeke"
+        elif hook_type == "Electricity Rate Video":
+            subj = f"Rate Database Video for {selected_acc}"
+            body = f"Hi,\n\nI thought you'd find this useful. Here is a quick video showing our current electricity rate database for {selected_acc} locations.\n\n[LINK TO VIDEO]\n\nBest,\nLeke"
+        else:
+            subj = f"Optimizing efficiency for {selected_acc}"
+            body = f"Hi,\n\nI'd love to connect regarding how we are helping companies like {selected_acc} navigate shifting utility costs...\n\nBest,\nLeke"
+
+        mailto = f"mailto:?subject={urllib.parse.quote(subj)}
