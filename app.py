@@ -6,72 +6,80 @@ import streamlit as st
 st.set_page_config(page_title="BDR Activity Dashboard", layout="wide")
 file_path = "LEKE FOCUS FOR MARCH - Sheet1.csv"
 
-# Load the data using built-in Python tools (No Pandas needed!)
 def load_data():
     if not os.path.exists(file_path):
         st.error(f"Could not find {file_path}")
         st.stop()
         
+    # Using utf-8-sig handles hidden characters at the start of Excel-saved CSVs
     with open(file_path, mode='r', encoding='utf-8-sig') as file:
         reader = csv.DictReader(file)
         data = list(reader)
-        fieldnames = list(reader.fieldnames) if reader.fieldnames else []
+        # Clean column names (strip whitespace)
+        fieldnames = [f.strip() for f in reader.fieldnames] if reader.fieldnames else []
         
-    # Add our tracking columns if they don't exist
-    if 'Last Outreach' not in fieldnames: fieldnames.append('Last Outreach')
-    if 'Status' not in fieldnames: fieldnames.append('Status')
-    if 'Notes' not in fieldnames: fieldnames.append('Notes')
+    # Ensure our tracking columns exist in the list of headers
+    for col in ['Last Outreach', 'Status', 'Notes']:
+        if col not in fieldnames:
+            fieldnames.append(col)
     
+    # Clean up the data rows to match cleaned headers
+    clean_data = []
     for row in data:
-        if 'Last Outreach' not in row: row['Last Outreach'] = 'None'
-        if 'Status' not in row: row['Status'] = 'Not Started'
-        if 'Notes' not in row: row['Notes'] = ''
+        clean_row = {k.strip(): v for k, v in row.items() if k}
+        if 'Last Outreach' not in clean_row: clean_row['Last Outreach'] = 'None'
+        if 'Status' not in clean_row: clean_row['Status'] = 'Not Started'
+        if 'Notes' not in clean_row: clean_row['Notes'] = ''
+        clean_data.append(clean_row)
         
-    return data, fieldnames
+    return clean_data, fieldnames
 
 data, fieldnames = load_data()
 
-# Dashboard Header & Metrics
 st.title("🚀 Leke's March Focus: BDR Dashboard")
 
+# Metric Calculations
 total_accounts = len(data)
-contacted_accounts = sum(1 for row in data if row.get('Status', 'Not Started') != 'Not Started')
+contacted_accounts = sum(1 for row in data if row.get('Status') != 'Not Started')
 
 cols = st.columns(3)
 cols[0].metric("Total Target Accounts", total_accounts)
 cols[1].metric("Accounts Contacted", contacted_accounts)
-cols[2].metric("Remaining to Contact", total_accounts - contacted_accounts)
+cols[2].metric("Remaining", total_accounts - contacted_accounts)
 
-# The Interactive List
-st.subheader("Current Priority List")
+# Display the Full Table
+st.subheader("Full Prospect List")
 st.dataframe(data, use_container_width=True)
 
-# BDR Update Form (Data Entry)
 st.divider()
-st.subheader("Log New Activity")
+st.subheader("Update Activity")
 
-# Get unique accounts for the dropdown
-accounts = list(set(row['Account'] for row in data if row.get('Account')))
+# Logic to find the 'Account' column even if it's named slightly differently
+account_col = next((f for f in fieldnames if f.lower() == 'account'), None)
 
-with st.form("update_form"):
-    selected_account = st.selectbox("Select Account", accounts)
-    new_status = st.selectbox("Activity Status", ["Email Sent", "Call Made", "Meeting Booked", "Follow Up Needed"])
-    new_notes = st.text_area("Activity Notes (What happened?)")
-    submit = st.form_submit_button("Update Record")
+if account_col:
+    # Create the list of names for the dropdown
+    account_names = [row[account_col] for row in data if row.get(account_col)]
+    
+    with st.form("update_form"):
+        selected_account = st.selectbox("Select Account", account_names)
+        new_status = st.selectbox("Activity Status", ["Email Sent", "Call Made", "Conversation Had", "Meeting Booked"])
+        new_notes = st.text_area("Notes")
+        submit = st.form_submit_button("Save Update")
 
-    if submit:
-        # Update the data
-        for row in data:
-            if row.get('Account') == selected_account:
-                row['Last Outreach'] = str(date.today())
-                row['Status'] = new_status
-                row['Notes'] = new_notes
-        
-        # Save back to the CSV file
-        with open(file_path, mode='w', newline='', encoding='utf-8') as file:
-            writer = csv.DictWriter(file, fieldnames=fieldnames)
-            writer.writeheader()
-            writer.writerows(data)
-        
-        st.success(f"✅ Successfully logged activity for {selected_account}!")
-        st.rerun()
+        if submit:
+            for row in data:
+                if row.get(account_col) == selected_account:
+                    row['Last Outreach'] = str(date.today())
+                    row['Status'] = new_status
+                    row['Notes'] = new_notes
+            
+            with open(file_path, mode='w', newline='', encoding='utf-8') as file:
+                writer = csv.DictWriter(file, fieldnames=fieldnames)
+                writer.writeheader()
+                writer.writerows(data)
+            
+            st.success(f"Updated {selected_account}!")
+            st.rerun()
+else:
+    st.error("Could not find a column named 'Account' in your file. Please check your CSV headers!")
