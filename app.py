@@ -83,4 +83,4 @@ with col2:
     body_enc = urllib.parse.quote(selected_template['body'])
     mailto_link = f"mailto:?subject={subject_enc}&body={body_enc}"
     
-    st.markdown(f'<a href="{mailto_link}" style="display: inline-block; padding
+    st.markdown(f'<a href="{mailto_link}" style="display: inline-block; padding: 12px 20px; background-color: #ff4b4b; color: white; text-align: center; text-decoration: none; font-size: 16px; border-radius: 8px;">📧 Open in Outlook / Gmail</a>', unsafe_allow_input=True, unsafe_allow_html=True)
