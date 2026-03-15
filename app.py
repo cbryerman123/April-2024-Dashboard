@@ -12,58 +12,79 @@ def load_data():
         st.stop()
         
     with open(file_path, mode='r', encoding='utf-8-sig') as file:
-        reader = csv.DictReader(file)
-        data = list(reader)
-        fieldnames = [f.strip() for f in reader.fieldnames] if reader.fieldnames else []
+        # We'll read the file as raw lists first to bypass the blank header issue
+        reader = csv.reader(file)
+        raw_rows = list(reader)
         
-    # Ensure tracking columns exist
-    for col in ['Last Outreach', 'Status', 'Notes']:
-        if col not in fieldnames:
-            fieldnames.append(col)
-    
-    return data, fieldnames
+    if not raw_rows:
+        st.error("The CSV file is empty!")
+        st.stop()
 
-data, fieldnames = load_data()
+    headers = raw_rows[0]
+    data_rows = raw_rows[1:]
+
+    # Ensure tracking columns exist in the header
+    for col in ['Last Outreach', 'Status', 'Notes']:
+        if col not in headers:
+            headers.append(col)
+
+    # Convert back to a list of dictionaries for Streamlit
+    clean_data = []
+    for row in data_rows:
+        # Fill in shorter rows with empty strings
+        while len(row) < len(headers):
+            row.append("")
+        
+        # Create a dictionary mapping header to row value
+        d = dict(zip(headers, row))
+        
+        # Default tracking values
+        if not d.get('Status'): d['Status'] = 'Not Started'
+        if not d.get('Last Outreach'): d['Last Outreach'] = 'None'
+        
+        clean_data.append(d)
+            
+    return clean_data, headers
+
+data, headers = load_data()
 
 st.title("🚀 Leke's March Focus: BDR Dashboard")
 
-# DETECTIVE WORK: Find the first column that isn't empty
-# We'll skip the columns that are just "" and find the one with the names
-real_data_col = None
-for col in fieldnames:
-    if col != "" and col not in ['Last Outreach', 'Status', 'Notes']:
-        real_data_col = col
-        break
+# We are going to find the FIRST column that actually has text in it
+# This bypasses the "" names entirely
+first_valid_col_index = 0
+for i, h in enumerate(headers):
+    # If the header is blank, we'll name it 'Account_Name' so we can use it
+    if h == "":
+        headers[i] = f"Column_{i+1}"
 
-# If we still can't find it, we'll just use the very first column
-if not real_data_col:
-    real_data_col = fieldnames[0]
+# Let's assume your names are in the very first column
+name_column = headers[0]
 
-# Display Table
-st.subheader(f"Project List (Tracking by: {real_data_col})")
+st.subheader(f"Project List")
 st.dataframe(data, use_container_width=True)
 
 st.divider()
 st.subheader("Update Activity")
 
-# Dropdown Menu
-account_names = [row[real_data_col] for row in data if row.get(real_data_col)]
+# Get the names from that first column
+account_names = [row[name_column] for row in data if row.get(name_column)]
 
 with st.form("update_form"):
-    selected_account = st.selectbox(f"Select {real_data_col}", account_names)
+    selected_account = st.selectbox("Select Account", account_names)
     new_status = st.selectbox("Activity Status", ["Email Sent", "Call Made", "Conversation Had", "Meeting Booked"])
     new_notes = st.text_area("Notes")
     submit = st.form_submit_button("Save Update")
 
     if submit:
         for row in data:
-            if row.get(real_data_col) == selected_account:
+            if row.get(name_column) == selected_account:
                 row['Last Outreach'] = str(date.today())
                 row['Status'] = new_status
                 row['Notes'] = new_notes
         
         with open(file_path, mode='w', newline='', encoding='utf-8') as file:
-            writer = csv.DictWriter(file, fieldnames=fieldnames)
+            writer = csv.DictWriter(file, fieldnames=headers)
             writer.writeheader()
             writer.writerows(data)
         
